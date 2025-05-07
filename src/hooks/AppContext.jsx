@@ -8,7 +8,8 @@ import React, {
 import PropTypes from "prop-types";
 
 const AppContext = createContext();
-const API_BASE_URL = "http://localhost:3001"; // Correct port
+const API_BASE_URL =
+  import.meta.env.VITE_BACKEND_URL || "http://localhost:3001"; // Correct port
 
 export const AppProvider = ({ children }) => {
   const [tenantId, setTenantId] = useState("acme");
