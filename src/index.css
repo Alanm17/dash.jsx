@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+/* Optional: Custom styles */
+
+/* You can add more global styles here if needed */
+
+.dark {
+  /* This is optional since Tailwind handles this with dark: variants */
+  background-color: #1a202c; /* Tailwind's gray-900 */
+  color: #ffffff;
+}
