@@ -1,9 +1,9 @@
 import React from "react";
 
-import Header from "../layout/header";
 import Sidebar from "./SideBar";
 import TenantInfo from "./tenantInfo";
 import { useAppContext } from "../../hooks/AppContext";
+import Header from "./Header";
 
 export default function Dashboard() {
   const { setTenantId, tenant, loading, toggleTheme, isDarkMode } =
