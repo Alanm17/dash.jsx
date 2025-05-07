@@ -4,7 +4,7 @@ import Sidebar from "./SideBar";
 
 import { useAppContext } from "../../hooks/AppContext";
 import Header from "./Header";
-import TenantInfo from "./tenantInfo";
+import TenantInfo from "./TenantInfo";
 
 export default function Dashboard() {
   const { setTenantId, tenant, loading, toggleTheme, isDarkMode } =
