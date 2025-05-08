@@ -4,12 +4,12 @@ import React, {
   useState,
   useEffect,
   useRef,
+  useCallback,
 } from "react";
 import PropTypes from "prop-types";
 
 const AppContext = createContext();
-const API_BASE_URL =
-  import.meta.env.VITE_BACKEND_URL || "http://localhost:3001"; // Correct port
+const API_BASE_URL = "http://localhost:3001"; // Base API URL
 
 export const AppProvider = ({ children }) => {
   const [tenantId, setTenantId] = useState("acme");
@@ -19,31 +19,95 @@ export const AppProvider = ({ children }) => {
   const [users, setUsers] = useState([]);
   const [analyticsData, setAnalyticsData] = useState(null);
 
-  // Separate fetch status refs for each data type
-  const tenantFetched = useRef(false);
-  const usersFetched = useRef(false);
-  const analyticsFetched = useRef(false);
+  // Track fetch status for each data type
+  const fetchStatus = useRef({
+    tenant: false,
+    users: false,
+    analytics: false,
+  });
 
-  // 1. Fetch tenant data
-  useEffect(() => {
-    const fetchTenant = async () => {
-      if (!tenantId || tenantFetched.current) return;
+  // Abort controllers for cancelling fetch requests
+  const abortControllers = useRef({});
+
+  // Reset all fetch statuses and abort any pending requests
+  const resetFetchState = useCallback(() => {
+    // Abort any ongoing requests
+    Object.values(abortControllers.current).forEach((controller) => {
+      if (controller) {
+        try {
+          controller.abort();
+        } catch (err) {
+          console.error("Error aborting request:", err);
+        }
+      }
+    });
+
+    // Reset fetch status
+    fetchStatus.current = {
+      tenant: false,
+      users: false,
+      analytics: false,
+    };
+
+    // Reset abort controllers
+    abortControllers.current = {};
+  }, []);
+
+  // Generic fetch function with error handling and performance tracking
+  const fetchData = useCallback(
+    async (endpoint, options = {}) => {
+      const controller = new AbortController();
+      const fetchKey = endpoint.split("/").pop(); // Use endpoint as key (tenant, users, analytics)
+
+      abortControllers.current[fetchKey] = controller;
+
+      const t1 = performance.now();
 
       try {
-        const t1 = performance.now();
-
-        const res = await fetch(`${API_BASE_URL}/api/tenant`, {
-          headers: { "x-tenant-id": tenantId },
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+          headers: {
+            "x-tenant-id": tenantId,
+            ...options.headers,
+          },
+          signal: controller.signal,
+          ...options,
         });
 
         const t2 = performance.now();
-        console.log(`Tenant fetch took ${t2 - t1}ms`);
+        console.log(`${fetchKey} fetch took ${t2 - t1}ms`);
 
-        if (!res.ok) {
-          throw new Error(`HTTP error! Status: ${res.status}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
         }
 
-        const data = await res.json();
+        return await response.json();
+      } catch (err) {
+        // Ignore AbortError as it's expected when we cancel requests
+        if (err.name !== "AbortError") {
+          console.error(`Failed to fetch ${fetchKey}:`, err);
+          throw err;
+        }
+      } finally {
+        delete abortControllers.current[fetchKey];
+      }
+    },
+    [tenantId]
+  );
+
+  // 1. Fetch tenant data
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchTenant = async () => {
+      if (fetchStatus.current.tenant || !tenantId) return;
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        const data = await fetchData("/api/tenant");
+
+        if (!isMounted) return;
 
         setTenant(
           data && typeof data === "object"
@@ -73,43 +137,43 @@ export const AppProvider = ({ children }) => {
               }
         );
 
-        tenantFetched.current = true;
+        fetchStatus.current.tenant = true;
       } catch (err) {
-        console.error("Failed to fetch tenant:", err);
-        setError("Failed to fetch tenant");
+        if (!isMounted) return;
+        console.error("error", err);
+        setError("Failed to fetch tenant data");
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchTenant();
-  }, [tenantId]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [tenantId, fetchData]);
 
   // 2. Fetch users when tenant is available and user management is enabled
   useEffect(() => {
+    let isMounted = true;
+
     const fetchUsers = async () => {
-      if (!tenantId || usersFetched.current) return;
+      if (fetchStatus.current.users || !tenantId) return;
 
       try {
-        const t1 = performance.now();
+        const data = await fetchData("/api/users");
 
-        const res = await fetch(`${API_BASE_URL}/api/users`, {
-          headers: { "x-tenant-id": tenantId },
-        });
+        if (!isMounted) return;
 
-        const t2 = performance.now();
-        console.log(`Users fetch took ${t2 - t1}ms`);
-
-        if (!res.ok) {
-          throw new Error(`HTTP error! Status: ${res.status}`);
-        }
-
-        const data = await res.json();
         setUsers(Array.isArray(data) ? data : []);
-
-        usersFetched.current = true;
-      } catch (error) {
-        console.error("Failed to fetch users:", error);
+        fetchStatus.current.users = true;
+      } catch (err) {
+        console.error("error", err);
+        if (!isMounted) return;
+        setError((prev) => prev || "Failed to fetch users data");
       }
     };
 
@@ -117,35 +181,32 @@ export const AppProvider = ({ children }) => {
     if (tenant && tenant.config.features.userManagement) {
       fetchUsers();
     }
-  }, [tenantId, tenant]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [tenantId, tenant, fetchData]);
 
   // 3. Fetch analytics data when tenant is available and analytics is enabled
   useEffect(() => {
+    let isMounted = true;
+
     const fetchAnalytics = async () => {
-      if (!tenantId || analyticsFetched.current) return;
+      if (fetchStatus.current.analytics || !tenantId) return;
 
       try {
-        const t1 = performance.now();
+        const data = await fetchData("/api/analytics");
 
-        const res = await fetch(`${API_BASE_URL}/api/analytics`, {
-          headers: { "x-tenant-id": tenantId },
-        });
+        if (!isMounted) return;
 
-        const t2 = performance.now();
-        console.log(`Analytics fetch took ${t2 - t1}ms`);
-
-        if (!res.ok) {
-          throw new Error(`HTTP error! Status: ${res.status}`);
-        }
-
-        const data = await res.json();
         setAnalyticsData(
           typeof data === "string" ? data : data ?? "No analytics"
         );
-
-        analyticsFetched.current = true;
-      } catch (error) {
-        console.error("Failed to fetch analytics:", error);
+        fetchStatus.current.analytics = true;
+      } catch (err) {
+        console.error("error", err);
+        if (!isMounted) return;
+        setError((prev) => prev || "Failed to fetch analytics data");
       }
     };
 
@@ -153,10 +214,14 @@ export const AppProvider = ({ children }) => {
     if (tenant && tenant.config.features.analytics) {
       fetchAnalytics();
     }
-  }, [tenantId, tenant]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [tenantId, tenant, fetchData]);
 
   // 4. Toggle dark/light theme
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     if (!tenant) return;
 
     const newTheme = tenant.config.theme === "dark" ? "light" : "dark";
@@ -164,51 +229,68 @@ export const AppProvider = ({ children }) => {
       ...prev,
       config: { ...prev.config, theme: newTheme },
     }));
-  };
+  }, [tenant]);
 
   // 5. Apply theme effect
   useEffect(() => {
     if (!tenant) return;
 
-    const root = document.documentElement;
     const isDark = tenant.config.theme === "dark";
 
-    if (isDark) {
-      root.classList.add("dark");
-      document.body.style.backgroundColor = "#1f2937"; // Tailwind gray-800
-      localStorage.setItem("theme", "dark");
-    } else {
-      root.classList.remove("dark");
-      document.body.style.backgroundColor = "#ffffff";
-      localStorage.setItem("theme", "light");
+    // Use a safer way to manipulate the DOM that works with SSR
+    if (typeof window !== "undefined") {
+      const root = document.documentElement;
+
+      if (isDark) {
+        root.classList.add("dark");
+        document.body.style.backgroundColor = "#1f2937"; // Tailwind gray-800
+        localStorage.setItem("theme", "dark");
+      } else {
+        root.classList.remove("dark");
+        document.body.style.backgroundColor = "#ffffff";
+        localStorage.setItem("theme", "light");
+      }
     }
   }, [tenant]);
 
   // 6. Reset fetch flags when tenant ID changes
   useEffect(() => {
-    // Reset fetch status when tenant changes
-    tenantFetched.current = false;
-    usersFetched.current = false;
-    analyticsFetched.current = false;
-  }, [tenantId]);
+    resetFetchState();
+  }, [tenantId, resetFetchState]);
+
+  // 7. Initialize theme from localStorage on mount (if available)
+  useEffect(() => {
+    if (typeof window !== "undefined" && !tenant) {
+      const savedTheme = localStorage.getItem("theme");
+      if (savedTheme && tenant) {
+        setTenant((prev) => ({
+          ...prev,
+          config: {
+            ...(prev?.config || {}),
+            theme: savedTheme,
+          },
+        }));
+      }
+    }
+  }, []);
+
+  const contextValue = {
+    tenantId,
+    setTenantId,
+    tenant,
+    loading,
+    error,
+    clearError: () => setError(null),
+    toggleTheme,
+    isDarkMode: tenant?.config?.theme === "dark",
+    users,
+    setUsers,
+    analyticsData,
+    refreshData: resetFetchState,
+  };
 
   return (
-    <AppContext.Provider
-      value={{
-        tenantId,
-        setTenantId,
-        tenant,
-        loading,
-        error,
-        toggleTheme,
-        isDarkMode: tenant?.config?.theme === "dark",
-        users,
-        setUsers,
-        analyticsData,
-      }}
-    >
-      {children}
-    </AppContext.Provider>
+    <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>
   );
 };
 
@@ -216,4 +298,10 @@ AppProvider.propTypes = {
   children: PropTypes.node.isRequired,
 };
 
-export const useAppContext = () => useContext(AppContext);
+export const useAppContext = () => {
+  const context = useContext(AppContext);
+  if (context === undefined) {
+    throw new Error("useAppContext must be used within an AppProvider");
+  }
+  return context;
+};
