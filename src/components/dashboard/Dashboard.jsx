@@ -7,8 +7,7 @@ import Header from "./Header";
 import TenantInfo from "./TenantInfo";
 
 export default function Dashboard() {
-  const { setTenantId, tenant, loading, toggleTheme, isDarkMode } =
-    useAppContext();
+  const { tenant, loading, isDarkMode } = useAppContext();
 
   if (loading) {
     return (
@@ -36,12 +35,7 @@ export default function Dashboard() {
         isDarkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"
       }`}
     >
-      <Header
-        tenant={tenant}
-        setTenantId={setTenantId}
-        isDarkMode={isDarkMode}
-        toggleTheme={toggleTheme}
-      />
+      <Header />
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         <div className="flex flex-col md:flex-row gap-4 sm:gap-6">
