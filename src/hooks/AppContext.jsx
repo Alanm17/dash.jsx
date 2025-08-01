@@ -9,7 +9,7 @@ import PropTypes from "prop-types";
 
 // Create the context
 const AppContext = createContext();
-const API_BASE_URL = "http://localhost:3001"; // ✅ No leading space
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL; // ✅ No leading space
 
 // AppProvider wraps your whole app and provides global state
 export const AppProvider = ({ children }) => {
