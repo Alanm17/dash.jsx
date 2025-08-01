@@ -19,8 +19,8 @@ export default function Header() {
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         {/* Logo and Name */}
         <div className="flex items-center space-x-2">
-          <span className="text-2xl">{tenant.logo}</span>
-          <span className="text-xl font-semibold">{tenant.name}</span>
+          <span className="text-2xl">{tenant.data.logo}</span>
+          <span className="text-xl font-semibold">{tenant.data.name}</span>
         </div>
 
         <div className="flex items-center space-x-4">
