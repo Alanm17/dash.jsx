@@ -8,8 +8,7 @@ import React, {
 import PropTypes from "prop-types";
 
 const AppContext = createContext();
-const API_BASE_URL =
-  import.meta.env.VITE_BACKEND_URL && "http://localhost:3001";
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
 console.log("API Base URL:", import.meta.env.VITE_BACKEND_URL);
 
@@ -43,7 +42,7 @@ export const AppProvider = ({ children }) => {
     const fetchTenant = async () => {
       setLoading(true);
       try {
-        const data = await fetchData("/api/tenant");
+        const data = await fetchData("api/tenant");
 
         setTenant({
           ...data,
