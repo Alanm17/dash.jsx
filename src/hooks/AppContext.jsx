@@ -42,7 +42,7 @@ export const AppProvider = ({ children }) => {
     const fetchTenant = async () => {
       setLoading(true);
       try {
-        const data = await fetchData("api/tenant");
+        const data = await fetchData("/api/tenant");
 
         setTenant({
           ...data,
