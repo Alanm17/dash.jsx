@@ -8,7 +8,10 @@ import React, {
 import PropTypes from "prop-types";
 
 const AppContext = createContext();
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL;
+const API_BASE_URL =
+  import.meta.env.VITE_BACKEND_URL && "http://localhost:3001";
+
+console.log("API Base URL:", import.meta.env.VITE_BACKEND_URL);
 
 // AppProvider wraps your app and provides global state and actions
 export const AppProvider = ({ children }) => {
