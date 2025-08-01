@@ -2,6 +2,12 @@ import { useAppContext } from "../../hooks/AppContext";
 import ThemeToggle from "../ui/ThemeToggle";
 import React from "react";
 
+const TENANTS = [
+  { key: "acme", label: "ACME Corporation", id: 1 },
+  { key: "startx", label: "StartX Ventures", id: 2 },
+  { key: "quantum", label: "Quantum Industries", id: 3 },
+];
+
 export default function Header() {
   const { tenant, tenantId, setTenantId, isDarkMode, toggleTheme } =
     useAppContext();
@@ -23,13 +29,15 @@ export default function Header() {
             className={`rounded px-3 py-1 ${
               isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-700"
             } border`}
-            value={tenantId.id}
-            onChange={(e) => setTenantId({ id: Number(e.target.value) })}
+            value={tenantId} // tenantId is string key now
+            onChange={(e) => setTenantId(e.target.value)}
             aria-label="Select tenant"
           >
-            <option value={1}>ACME Corporation</option>
-            <option value={2}>StartX Ventures</option>
-            <option value={3}>Quantum Industries</option>
+            {TENANTS.map(({ key, label }) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
           </select>
 
           {/* Theme Toggle */}

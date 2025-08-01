@@ -7,42 +7,40 @@ import React, {
 } from "react";
 import PropTypes from "prop-types";
 
-// Create the context
 const AppContext = createContext();
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL; // ✅ No leading space
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
-// AppProvider wraps your whole app and provides global state
+// AppProvider wraps your app and provides global state and actions
 export const AppProvider = ({ children }) => {
-  const [tenantId, setTenantId] = useState({ id: 1 });
+  const [tenantId, setTenantId] = useState("acme"); // <-- string key for tenant
   const [tenant, setTenant] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [users, setUsers] = useState([]);
   const [analyticsData, setAnalyticsData] = useState(null);
 
-  // These flags make sure we only fetch once per tenant switch
+  // Flags to prevent duplicate fetching on same tenantId
   const tenantFetched = useRef(false);
   const usersFetched = useRef(false);
   const analyticsFetched = useRef(false);
 
+  // Helper to fetch JSON and handle errors
+  const fetchData = async (endpoint) => {
+    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+      headers: { "x-tenant-id": tenantId },
+    });
+    if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+    return res.json();
+  };
+
   // 1. Fetch tenant data
   useEffect(() => {
+    if (!tenantId || tenantFetched.current) return;
+
     const fetchTenant = async () => {
-      if (!tenantId || tenantFetched.current) return;
-
+      setLoading(true);
       try {
-        const t1 = performance.now();
-
-        const res = await fetch(`${API_BASE_URL}/api/tenant`, {
-          headers: { "x-tenant-id": tenantId.id },
-        });
-
-        const t2 = performance.now();
-        console.log(`Tenant fetch took ${t2 - t1}ms`);
-
-        if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-
-        const data = await res.json();
+        const data = await fetchData("/api/tenant");
 
         setTenant({
           ...data,
@@ -54,10 +52,12 @@ export const AppProvider = ({ children }) => {
               notifications: !!data.config?.features?.notifications,
               chat: !!data.config?.features?.chat,
             },
+            primaryColor: data.config?.primaryColor || "#3b82f6",
           },
         });
 
         tenantFetched.current = true;
+        setError(null);
       } catch (err) {
         console.error("Failed to fetch tenant:", err);
         setError("Failed to fetch tenant");
@@ -69,69 +69,45 @@ export const AppProvider = ({ children }) => {
     fetchTenant();
   }, [tenantId]);
 
-  // 2. Fetch users
+  // 2. Fetch users if feature enabled
   useEffect(() => {
+    if (!tenantId || usersFetched.current) return;
+    if (!tenant?.config?.features?.userManagement) return;
+
     const fetchUsers = async () => {
-      if (!tenantId || usersFetched.current) return;
-
       try {
-        const t1 = performance.now();
-
-        const res = await fetch(`${API_BASE_URL}/api/users`, {
-          headers: { "x-tenant-id": tenantId.id },
-        });
-
-        const t2 = performance.now();
-        console.log(`Users fetch took ${t2 - t1}ms`);
-
-        if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-
-        const data = await res.json();
+        const data = await fetchData("/api/users");
         setUsers(Array.isArray(data) ? data : []);
         usersFetched.current = true;
-      } catch (error) {
-        console.error("Failed to fetch users:", error);
+      } catch (err) {
+        console.error("Failed to fetch users:", err);
       }
     };
 
-    if (tenant && tenant.config.features.userManagement) {
-      fetchUsers();
-    }
+    fetchUsers();
   }, [tenantId, tenant]);
 
-  // 3. Fetch analytics
+  // 3. Fetch analytics if feature enabled
   useEffect(() => {
+    if (!tenantId || analyticsFetched.current) return;
+    if (!tenant?.config?.features?.analytics) return;
+
     const fetchAnalytics = async () => {
-      if (!tenantId || analyticsFetched.current) return;
-
       try {
-        const t1 = performance.now();
-
-        const res = await fetch(`${API_BASE_URL}/api/analytics`, {
-          headers: { "x-tenant-id": tenantId.id },
-        });
-
-        const t2 = performance.now();
-        console.log(`Analytics fetch took ${t2 - t1}ms`);
-
-        if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-
-        const data = await res.json();
+        const data = await fetchData("/api/analytics");
         setAnalyticsData(
           typeof data === "string" ? data : data ?? "No analytics"
         );
         analyticsFetched.current = true;
-      } catch (error) {
-        console.error("Failed to fetch analytics:", error);
+      } catch (err) {
+        console.error("Failed to fetch analytics:", err);
       }
     };
 
-    if (tenant && tenant.config.features.analytics) {
-      fetchAnalytics();
-    }
+    fetchAnalytics();
   }, [tenantId, tenant]);
 
-  // 4. Toggle between light/dark theme
+  // 4. Toggle theme light/dark
   const toggleTheme = () => {
     if (!tenant) return;
     const newTheme = tenant.config.theme === "dark" ? "light" : "dark";
@@ -160,14 +136,13 @@ export const AppProvider = ({ children }) => {
     }
   }, [tenant]);
 
-  // 6. Reset flags when tenantId changes
+  // 6. Reset fetch flags on tenantId change
   useEffect(() => {
     tenantFetched.current = false;
     usersFetched.current = false;
     analyticsFetched.current = false;
   }, [tenantId]);
 
-  // Provide all the values to children
   return (
     <AppContext.Provider
       value={{
@@ -192,5 +167,4 @@ AppProvider.propTypes = {
   children: PropTypes.node.isRequired,
 };
 
-// Custom hook to use the context
 export const useAppContext = () => useContext(AppContext);
