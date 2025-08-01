@@ -29,7 +29,7 @@ export const AppProvider = ({ children }) => {
   // Helper to fetch JSON and handle errors
   const fetchData = async (endpoint) => {
     const res = await fetch(`${API_BASE_URL}${endpoint}`, {
-      headers: { "x-tenant-id": tenantId },
+      headers: { "X-Tenant-ID": tenantId },
     });
     if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
     return res.json();
