@@ -35,8 +35,7 @@ export const AppProvider = ({ children }) => {
 
   // Tenant
   useEffect(() => {
-    if (!tenantId || tenantFetched.current) return;
-
+    if (!tenantId) return;
     const fetchTenant = async () => {
       setLoading(true);
       try {
@@ -55,7 +54,6 @@ export const AppProvider = ({ children }) => {
             primaryColor: tenantConfig.primaryColor || "#3b82f6",
           },
         });
-        tenantFetched.current = true;
         setError(null);
       } catch (err) {
         console.error("Failed to fetch tenant:", err);
