@@ -8,13 +8,12 @@ import React, {
 import PropTypes from "prop-types";
 
 const AppContext = createContext();
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL;
-
-console.log("API Base URL:", import.meta.env.VITE_BACKEND_URL);
+const API_BASE_URL =
+  "http://localhost:3001" || import.meta.env.VITE_BACKEND_URL;
 
 // AppProvider wraps your app and provides global state and actions
 export const AppProvider = ({ children }) => {
-  const [tenantId, setTenantId] = useState("acme"); // <-- string key for tenant
+  const [tenantId, setTenantId] = useState("1"); // <-- string key for tenant
   const [tenant, setTenant] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -25,8 +24,8 @@ export const AppProvider = ({ children }) => {
   const tenantFetched = useRef(false);
   const usersFetched = useRef(false);
   const analyticsFetched = useRef(false);
+  // import.meta.env.VITE_BACKEND_URL ||
 
-  // Helper to fetch JSON and handle errors
   const fetchData = async (endpoint) => {
     const res = await fetch(`${API_BASE_URL}${endpoint}`, {
       headers: { "X-Tenant-ID": tenantId },
@@ -35,29 +34,28 @@ export const AppProvider = ({ children }) => {
     return res.json();
   };
 
-  // 1. Fetch tenant data
+  // Tenant
   useEffect(() => {
     if (!tenantId || tenantFetched.current) return;
 
     const fetchTenant = async () => {
       setLoading(true);
       try {
-        const data = await fetchData("/api/tenant");
-
+        const res = await fetchData("/api/tenant");
+        const tenantConfig = res.data?.config || {};
         setTenant({
-          ...data,
+          ...res.data,
           config: {
-            theme: data.config?.theme || "light",
+            theme: tenantConfig.theme || "light",
             features: {
-              analytics: !!data.config?.features?.analytics,
-              userManagement: !!data.config?.features?.userManagement,
-              notifications: !!data.config?.features?.notifications,
-              chat: !!data.config?.features?.chat,
+              analytics: !!tenantConfig.features?.analytics,
+              userManagement: !!tenantConfig.features?.userManagement,
+              notifications: !!tenantConfig.features?.notifications,
+              chat: !!tenantConfig.features?.chat,
             },
-            primaryColor: data.config?.primaryColor || "#3b82f6",
+            primaryColor: tenantConfig.primaryColor || "#3b82f6",
           },
         });
-
         tenantFetched.current = true;
         setError(null);
       } catch (err) {
@@ -67,20 +65,17 @@ export const AppProvider = ({ children }) => {
         setLoading(false);
       }
     };
-
     fetchTenant();
   }, [tenantId]);
 
-  // 2. Fetch users if feature enabled
+  // Users
   useEffect(() => {
-    if (!tenantId || usersFetched.current) return;
-    if (!tenant?.config?.features?.userManagement) return;
+    if (!tenantId || !tenant?.config?.features?.userManagement) return;
 
     const fetchUsers = async () => {
       try {
-        const data = await fetchData("/api/users");
-        setUsers(Array.isArray(data) ? data : []);
-        usersFetched.current = true;
+        const res = await fetchData("/api/users");
+        setUsers(res.data || []);
       } catch (err) {
         console.error("Failed to fetch users:", err);
       }
@@ -89,18 +84,14 @@ export const AppProvider = ({ children }) => {
     fetchUsers();
   }, [tenantId, tenant]);
 
-  // 3. Fetch analytics if feature enabled
+  // Analytics
   useEffect(() => {
-    if (!tenantId || analyticsFetched.current) return;
-    if (!tenant?.config?.features?.analytics) return;
+    if (!tenantId || !tenant?.config?.features?.analytics) return;
 
     const fetchAnalytics = async () => {
       try {
-        const data = await fetchData("/api/analytics");
-        setAnalyticsData(
-          typeof data === "string" ? data : data ?? "No analytics"
-        );
-        analyticsFetched.current = true;
+        const res = await fetchData("/api/analytics");
+        setAnalyticsData(res.data || {});
       } catch (err) {
         console.error("Failed to fetch analytics:", err);
       }

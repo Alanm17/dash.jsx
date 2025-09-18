@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 
 import {
   ComposedChart,
@@ -17,6 +17,9 @@ import { useAppContext } from "../../hooks/AppContext";
 
 export default function Analytics() {
   const { isDarkMode, loading, error, analyticsData } = useAppContext();
+  useEffect(() => {
+    console.log("Analytics data:", analyticsData);
+  }, [analyticsData]);
   const data = [
     {
       name: "Page A",
